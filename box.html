@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOX package system</title>
+    <style>
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .untouchable {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Elements default */
+
+        html, body{
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            color: #f0f0f0;
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            background-color: #4caf50;
+            cursor: pointer;
+            color: #f0f0f0;
+        }
+
+        canvas, textarea{
+            max-width: 100%;
+            max-height: 100%;
+            border: 1px solid #2c2c2c;
+            background-color: #2c2c2c;
+            color: #f0f0f0;
+        }
+
+        textarea {
+            border-radius: 8px;
+            width: 100%;
+            height: 100%;
+            resize: none;
+            white-space: pre-line;
+            overflow: scroll;
+            font-family: monospace;
+        }
+
+        /* Classes */
+
+        button.hard {
+            background-color: #607d8b;
+        }
+
+        .grid, div {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+        }
+
+        .grid-gap{
+            row-gap: 0.25em;
+            column-gap: 0.25em;
+        }
+
+        .panel-header {
+            background-color: #2c2c2c;
+            border-radius: 8px;
+            color: #f0f0f0;
+        }
+
+        .panel-content{
+            background-color: #3a3a3a;
+            border-radius: 8px;
+            color: #f0f0f0;
+        }
+
+        .tab {
+            padding: 0.7em 1.2em;
+            cursor: pointer;
+            background-color: #333;
+            border: 1px solid #444;
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            margin-right: 0.1em;
+        }
+
+        .tab.active {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background-color: #3a3a3a;
+            padding: 1em;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .tab-content.active {
+            display: grid;
+        }
+
+        .files-list{
+            overflow-y: scroll;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #555;
+            border-bottom: 1px solid #555;
+            padding-left: 1em;
+            padding-right: 1em;
+            padding-top: 0.2em;
+            padding-bottom: 0.2em;
+            font-family: monospace;
+        }
+
+        .file-item.selected {
+            background-color: #2196f3;
+        }
+
+        .file-buttons{
+            display: flex;
+            gap: 5px;
+        }
+
+        .delete-btn,
+        .move-up-btn,
+        .move-down-btn,
+        .select-btn{
+            background-color: #555;
+            color: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            padding: 0.3em 0.7em;
+            cursor: pointer;
+        }
+
+        .move-up-btn, .move-down-btn { background-color: #607d8b; }
+        .select-btn { background-color: #4caf50; }
+
+        .centered-text{
+            justify-content: center;
+            align-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="grid-gap" style=" width: 95%; height: 95%; grid-template-rows: 1fr 19fr">
+        <div class="grid-gap" style="grid-template-columns: 1fr 1fr;"><!-- Top panel -->
+            <button id="compileBox">💾 Save / Compile BOX file</button>
+            <button class="hard" id="loadBox">📂 Load BOX file</button>
+        </div>
+        <div class="grid-gap" style="grid-template-columns: 1fr 1fr;"><!-- Bottom panel -->
+            <div class="grid-gap" style="grid-template-rows: 1fr 18fr 1fr;"><!-- Left-bottom panel -->
+                <span class="panel-header untouchable centered-text">📂 Files</span><!-- Header -->
+                <div class="panel-content grid-gap files-list" id="fileList"></div>
+                <div class="grid-gap" style="grid-template-columns: 1fr 1fr;"><!-- Files buttons -->
+                    <button id="addFile">📑 Add</button>
+                    <button id="deleteFile" style="background-color: #e53935;">📇 Remove</button>
+                </div>
+            </div>
+            <div class="grid-gap" style="grid-template-rows: 1fr 18fr 1fr;"><!-- Right-bottom panel -->
+                <span class="panel-header untouchable centered-text">📃 View</span><!-- Header -->
+                <div style="grid-template-rows: 1fr 9fr;">
+                    <div style="grid-template-columns: 1fr 1fr 1fr;">
+                        <div class="tab active untouchable" id="tabut1">📋 Binary</div>
+                        <div class="tab untouchable" id="tabut2">✏️ Text</div>
+                        <div class="tab untouchable" id="tabut3">🖼️ Image</div>
+                    </div>
+                    <div id="tabcontent">
+                        <div class="tab-content active" id="tab1"><textarea id="binary"></textarea></div>
+                        <div class="tab-content" id="tab2"><textarea id="text"></textarea></div>
+                        <div class="tab-content" id="tab3" style="overflow: scroll; justify-items: center; align-items: center;"><canvas id="image"></canvas></div>
+                    </div>
+                </div>
+                <div class="grid-gap" style="grid-template-columns: 1fr 1fr 0.5fr;"><!-- Files buttons -->
+                    <button id="prev-page">⏪ Previous page</button>
+                    <button id="next-page">⏩ Next page</button>
+                    <span class="panel-header untouchable centered-text" id="curr-page" style="font-family: monospace;">0 / 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script>//Hax
+    let stubbornElements = new Array();
+    let originalStubbornScale = new Array();
+
+    function updateHeight() {
+        document.body.style.height = window.innerHeight + "px";
+        document.body.style.maxHeight = window.innerHeight + "px";
+
+        for(let i = 0;i<stubbornElements.length;i++){
+            let element = stubbornElements[i];
+            element.style.height = "1px";
+        }
+
+        for(let i = 0;i<stubbornElements.length;i++){
+            let element = stubbornElements[i];
+            element.style.height = Math.floor(originalStubbornScale[i] * element.parentElement.clientHeight) + "px";
+        }
+    }
+    window.onresize = updateHeight;
+
+    function addStubbornElement(elementId){
+        let element = document.getElementById(elementId);
+        stubbornElements.push(element);
+        originalStubbornScale.push(element.clientHeight / element.parentElement.clientHeight);
+    }
+
+    addStubbornElement("fileList");
+    addStubbornElement("tabcontent");
+
+    updateHeight();
+</script>
+
+<script>//Graphics exclusive (Tab view system)
+    class Tabs{
+        buttons;
+        panels;
+        lastActive;
+
+        constructor(){
+            this.buttons = new Array();
+            this.panels = new Array();
+            this.lastActive = null;
+        }
+
+        addTab(buttonId, panelId){
+            let button = document.getElementById(buttonId);
+            let panel = document.getElementById(panelId);
+            
+            this.buttons.push(button);
+            this.panels.push(panel);
+
+            if(this.lastActive == null){
+                this.lastActive = new Array(2);
+                this.lastActive[0] = button;
+                this.lastActive[1] = panel;
+            }
+
+            let LA = this.lastActive;
+            function tabclick(){//this is horrible, but will work.
+                if(button.classList.contains("active")) return;
+
+                LA[0].classList.remove("active");
+                LA[1].classList.remove("active");
+
+                LA[0] = button;
+                LA[1] = panel;
+
+                button.classList.add("active");
+                panel.classList.add("active");
+            }
+
+            button.onclick = tabclick;
+        }
+    }
+
+    let tabs = new Tabs();
+    tabs.addTab("tabut1","tab1");
+    tabs.addTab("tabut2","tab2");
+    tabs.addTab("tabut3","tab3");
+</script>
+
+<script src="./binaryManager.js"></script>
+
+<script>
+    const fsList = new FileSelectionList();
+    const gDisplay = new GraphicSystem();
+
+    //Element indexing
+
+    gDisplay.putElement("compileBox", "CompileBox");
+    gDisplay.putElement("loadBox", "LoadBox");
+
+    gDisplay.putElement("addFile", "AddFile");
+    gDisplay.putElement("deleteFile", "RemoveFile");
+    
+    gDisplay.putElement("next-page", "NextPage");
+    gDisplay.putElement("prev-page", "PreviousPage");
+
+    gDisplay.putElement("fileList", "ListFile");
+    gDisplay.putElement("curr-page", "PageCounter");
+
+    gDisplay.putElement("binary", "FileBinaryField");
+    gDisplay.putElement("text", "FileTextField");
+    gDisplay.putElement("image", "FileImageField");
+
+    //Values initialization
+
+    gDisplay.putValue("SelectedId", 0);
+
+    //Action creation
+
+    gDisplay.putAction("BoxCompile", (context, content) => {//                  Box compile (void)
+        let compiled = BoxParser.createBinary(fsList.fileList);
+        const blob = new Blob([compiled], { type: "application/octet-stream" });
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "Package.box";
+        a.click();
+
+        URL.revokeObjectURL(a.href);
+    });
+
+    gDisplay.putAction("BoxLoad", async (context, content) => {//               Box load (void)
+        let files = await FileParser.requestFiles();
+        if(files.length == 0){ console.error("No files found at Box loading"); return; }
+        let bytes = await FileParser.getFileBytes(files[0]);
+        let parsedList = BoxParser.parseBinaryBox(bytes);
+        fsList.fileList = parsedList;
+        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: 0});
+    });
+
+    gDisplay.putAction("GraphicListReset", (context, content) => {//            List Reset (void)
+        let listElement = context.getElement("ListFile");
+        listElement.innerHTML = "";
+    });
+
+    gDisplay.putAction("GraphicListSelectItem", (context, content) => {//       List Select (int ID)
+        let listElement = context.getElement("ListFile");
+        if(listElement.children.length == 0){ return; }
+
+        let selectedId = context.getValue("SelectedId");
+        if(selectedId < listElement.children.length){
+            listElement.children[selectedId].classList.remove("selected");
+        }
+
+        let index = content.ID;
+        listElement.children[index].classList.add("selected");
+        context.putValue("SelectedId", index);
+    });
+
+    gDisplay.putAction("GraphicListAddItem", (context, content) => {//          List Add (String name) [Inner action]
+        let listElement = context.getElement("ListFile");
+        let id = listElement.children.length;
+        let element = document.createElement('div');
+        element.classList.add("file-item");
+        element.classList.add("grid-pad");
+        element.innerHTML = `
+        <span class="untouchable">[${id}]</span>
+        <span class="untouchable">${content.name}</span>
+        <div class="file-buttons">
+            <button class="select-btn untouchable">✔</button>
+            <button class="move-up-btn untouchable">↑</button>
+            <button class="move-down-btn untouchable">↓</button>
+        </div>
+        `;
+
+        let selectBtn = element.getElementsByClassName("select-btn")[0];
+        let moveUpBtn = element.getElementsByClassName("move-up-btn")[0];
+        let moveDownBtn = element.getElementsByClassName("move-down-btn")[0];
+
+        selectBtn.onclick = () => { context.playAction("SelectFile", {ID:id}) };
+        moveUpBtn.onclick = () => { context.playAction("MoveUpFile", {ID:id}) };
+        moveDownBtn.onclick = () => { context.playAction("MoveDownFile", {ID:id}) };
+
+        listElement.appendChild(element);
+    });
+
+    gDisplay.putAction("GraphicListRebuild", (context, content) => {//          List rebuild (String[] names)
+        context.playAction("GraphicListReset", null);
+        let names = content.names;
+        let action = context.getAction("GraphicListAddItem");
+        for(let i = 0; i < names.length; i++){
+            action(context, {name: names[i]});
+        }
+    });
+
+    gDisplay.putAction("GraphicDisplayReset", (context, content) => {//         Display reset (void)
+        context.getElement("FileBinaryField").value = "";
+        context.getElement("FileTextField").value = "";
+        let canvas = context.getElement("FileImageField");
+        canvas.width = 300;
+        canvas.height = 150;
+        canvas.getContext("2d").putImageData(new ImageData(300,150),0,0);
+        context.getElement("PageCounter").innerText = "";
+    });
+
+    gDisplay.putAction("GraphicDisplayLoadPage", (context, content) => {//      Display load page (String binary, String text, int currentPage, int maximumPage)
+        context.getElement("FileBinaryField").value = content.binary;
+        context.getElement("FileTextField").value = content.text;
+        context.getElement("PageCounter").innerText = `${content.currentPage} or ${content.maximumPage}`;
+    });
+
+    gDisplay.putAction("GraphicDisplayLoad", (context, content) => {//          Display load (String binary, String text, ImageData image, int currentPage, int maximumPage)
+        context.playAction("GraphicDisplayLoadPage", content);
+        let canvas = context.getElement("FileImageField");
+        canvas.width = content.image.width;
+        canvas.height = content.image.height;
+        canvas.getContext("2d").putImageData(content.image,0,0);
+    });
+
+    gDisplay.putAction("AddFile", async (context, content) => {//               General add file (void)
+        await fsList.includeFiles();
+        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    gDisplay.putAction("RemoveFile", (context, content) => {//                  General remove file (void)
+        fsList.removeSelected();
+        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        if(fsList.fileList.length == 0){
+            context.playAction("GraphicDisplayReset", null);
+            return;
+        }
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    gDisplay.putAction("NextPage", (context, content) => {//                    General next page (void)
+        fsList.display.nextPage();
+        gDisplay.playAction("GraphicDisplayLoadPage", {
+            binary: fsList.display.hexadecimal,
+            text: fsList.display.text,
+            currentPage: fsList.display.page,
+            maximumPage: fsList.display.getMaxPage()
+        })
+    });
+
+    gDisplay.putAction("PreviousPage", (context, content) => {//                General previous page (void)
+        fsList.display.previousPage();
+        gDisplay.playAction("GraphicDisplayLoadPage", {
+            binary: fsList.display.hexadecimal,
+            text: fsList.display.text,
+            currentPage: fsList.display.page,
+            maximumPage: fsList.display.getMaxPage()
+        })
+    });
+
+    gDisplay.putAction("SelectFile", (context, content) => {//                  General Select (int ID)
+        fsList.selectFile(content.ID);
+        content.ID = fsList.selectedIndex;
+        context.playAction("GraphicListSelectItem", content);
+        context.playAction("GraphicDisplayLoad", {
+            binary: fsList.display.hexadecimal,
+            text: fsList.display.text,
+            image: fsList.display.image,
+            currentPage: fsList.display.page,
+            maximumPage: fsList.display.getMaxPage()
+        });
+    });
+
+    gDisplay.putAction("MoveUpFile", (context, content) => {//                  General Move up (int ID)
+        fsList.moveFileUp(content.ID);
+        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    gDisplay.putAction("MoveDownFile", (context, content) => {//                General Move down (int ID)
+        fsList.moveFileDown(content.ID);
+        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    //Button linking
+
+    gDisplay.addClickAction("CompileBox", "BoxCompile", null);
+    gDisplay.addClickAction("LoadBox", "BoxLoad", null);
+    gDisplay.addClickAction("AddFile", "AddFile", null);
+    gDisplay.addClickAction("RemoveFile", "RemoveFile", null);
+    gDisplay.addClickAction("NextPage", "NextPage", null);
+    gDisplay.addClickAction("PreviousPage", "PreviousPage", null);
+
+</script>
+
+</html>
