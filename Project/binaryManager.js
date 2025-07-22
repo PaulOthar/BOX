@@ -180,12 +180,6 @@ class BinaryUnit{
     }
 
     static binaryType = {
-        //BIN: 'BIN\0\0\0\0\0',
-        //IMG_1BPP: "IMG_1\0\0\0",
-        //IMG_4BPP: "IMG_4\0\0\0",
-        //IMG_8BPP: "IMG_8\0\0\0",
-        //IMG_24BPP: "IMG_24\0\0",
-        //IMG_32BPP: "IMG_32\0\0",
         BIN: StaticUtils.padString("BIN",8),
         IMG_1BPP: StaticUtils.padString("IMG_1",8),
         IMG_4BPP: StaticUtils.padString("IMG_4",8),
@@ -737,3 +731,141 @@ class GraphicSystem{
         };
     }
 }
+
+//---------------- Persistance ----------------
+
+class PersistanceManager{
+    static async databaseExists(name) {
+        if (!indexedDB.databases) return false;
+        const dbs = await indexedDB.databases();
+        return dbs.some(db => db.name === name);
+    }
+
+    static async getObject(name){
+        if(!await PersistanceManager.databaseExists(name)){ return null; }
+
+        const db = await new Promise((resolve, reject) => {
+            const request = indexedDB.open(name);
+
+            request.onerror = (event) => reject( event.target.error );
+            request.onsuccess = (event) => resolve( event.target.result );
+        });
+
+        const request = db.transaction("main", "readonly").objectStore("main").get("root");
+        return await new Promise((resolve, reject) => {
+            request.onsuccess = () => { db.close(); resolve(request.result?.data ?? null); };
+            request.onerror = (event) => { db.close(); reject(event.target.error); };
+        });
+    }
+
+    static async deleteObject(name){
+        if(!await PersistanceManager.databaseExists(name)){ return; }
+        const result = await new Promise((resolve, reject) => {
+            const deleteRequest = indexedDB.deleteDatabase(name);
+            deleteRequest.onerror = (event) => { reject(event.target.error); };
+            deleteRequest.onsuccess = () => { resolve(null); };
+            deleteRequest.onblocked = () => { reject("Blocked action"); };
+        });
+        return result;
+    }
+
+    static async createObject(name, object){
+        return await new Promise((resolve, reject) => {
+            const request = indexedDB.open(name);
+            request.onerror = (event) => { reject(event.target.error); };
+            request.onsuccess = (event) => { event.target.result.close(); };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+
+                const store = db.createObjectStore("main", { keyPath: "id" });
+                store.transaction.oncomplete = () => {
+                    const tx = db.transaction("main", "readwrite");
+
+                    const mainStore = tx.objectStore("main");
+                    mainStore.put({ id: "root", data: object });
+
+                    tx.oncomplete = () => { db.close(); resolve(null); };
+                    tx.onerror = (event) => { db.close(); reject( event.target.error ); }
+                };
+            };
+        });
+    }
+
+    static async persistObject(name, object){
+        await PersistanceManager.deleteObject(name);
+        await PersistanceManager.createObject(name, object);
+    }
+}
+
+class MapHell{
+    master;
+
+    static separator = '/';
+
+    constructor(){
+        this.master = new Map();
+    }
+
+    initializeMap(path){//This will nuke whatever data existed in this path
+        let splitted = path.split(MapHell.separator);
+        let lastFetched = this.master;
+        for(let i = 0; i < splitted.length; i++){
+            let map = new Map();
+            lastFetched.set(splitted[i], map);
+            lastFetched = map;
+        }
+    }
+
+    getData(path){
+        let splitted = path.split(MapHell.separator);
+        let lastFetched = this.master;
+        for(let i = 0; i < splitted.length; i++){
+            let map = lastFetched.get(splitted[i]);
+            if(!map){ return null; }
+            lastFetched = map;
+        }
+        return lastFetched;
+    }
+
+    setData(path, data){
+        let splitted = path.split(MapHell.separator);
+        let lastFetched = this.master;
+        for(let i = 0; i < splitted.length - 1; i++){
+            let map = lastFetched.get(splitted[i]);
+            if(!map){ return null; }
+            lastFetched = map;
+        }
+        lastFetched.set(splitted[splitted.length - 1], data);
+        return data;
+    }
+}
+
+class Configs{
+    static maphell = null;
+
+    static configsName = "BOXConfigs";
+    static fileDisplayPageSize = "pageSize";
+    
+    static async initializePersistantData(){
+        let persisted = await PersistanceManager.getObject(Configs.configsName);
+        if(persisted == null){
+            persisted = new MapHell();
+            persisted.setData(Configs.fileDisplayPageSize, 1 << 15);
+        }
+
+        //FileDisplay.pageSize = persisted.getData(Configs.fileDisplayPageSize);
+
+        Configs.maphell = persisted;
+    }
+
+    static getData(path){
+        return Configs.maphell.getData(path);
+    }
+
+    static async setData(path, data){
+        let set = Configs.maphell.setData(path, data);
+        if(set == null){ return; }
+        await PersistanceManager.persistObject(Configs.configsName, Configs.maphell);
+    }
+}
+Configs.initializePersistantData();
