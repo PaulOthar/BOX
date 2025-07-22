@@ -1,32 +1,216 @@
+//---------------- System ----------------
+
+class StaticUtils{
+    static hexifyBytes(bytes){
+        let result = new String();
+        for(let i = 0; i < bytes.length; i++){
+            result += ((bytes[i] >> 4) & 0xf).toString(16);
+            result += (bytes[i]& 0xf).toString(16);
+        }
+        return result;
+    }
+
+    static encodeNumber(number, bytes){
+        let encoded = new Uint8Array(bytes);
+        for(let i = 0; i < bytes; i++){
+            let shift = (bytes - 1 - i) * 8;
+            encoded[i] = (number >> shift) & 0xff;
+        }
+        return encoded;
+    }
+
+    static decodeNumber(stream, bytes, index){
+        let result = 0;
+        for(let i = index; i < (bytes + index) && i < stream.length; i++){
+            result = (result << 8) | stream[i];
+        }
+        return result;
+    }
+
+    static encodeString(string, bytes){
+        let encoded = new Uint8Array(bytes);
+        let encoder = new TextEncoder();
+        let text = encoder.encode(string);
+
+        for(let i = 0; i < bytes; i++){
+            if(i >= text.length){
+                encoded[i] = 0;
+                continue;
+            }
+            encoded[i] = text[i];
+        }
+
+        return encoded;
+    }
+
+    static decodeString(stream, bytes, index){
+        let result = new String();
+        for(let i = index; i < (bytes + index) && i < stream.length; i++){
+            result += String.fromCharCode(stream[i]);
+        }
+        return result;
+    }
+
+    static padString(string, bytes){
+        let stream = StaticUtils.encodeString(string, bytes);
+        return this.decodeString(stream, bytes, 0);
+    }
+
+    static encodeDate(){
+        let date32 = 0;
+        let now = new Date();
+        date32 = now.getFullYear();
+        date32 = (date32 << 4) | (now.getMonth() + 1);
+        date32 = (date32 << 5) | (now.getDate());
+        date32 = (date32 << 5) | (now.getHours());
+        date32 = (date32 << 6) | (now.getMinutes());
+
+        return StaticUtils.encodeNumber(date32,4);
+    }
+
+    static decodeDate(date){
+        //To implement
+        return 0;
+    }
+
+    static auxiliaryInput = StaticUtils._createAuxiliaryInput();
+    static auxiliaryCanvas = StaticUtils._createAuxiliaryCanvas();
+
+    static _createAuxiliaryInput(){
+        let input = document.createElement("input");
+        input.type = "file"
+        input.multiple = true;
+        return input;
+    }
+
+    static _createAuxiliaryCanvas(){
+        let canvas = document.createElement("canvas");;
+        return canvas;
+    }
+
+    static async requestFiles(accept){
+        const result = await new Promise((resolve, reject) => {
+            if(accept != null){ StaticUtils.auxiliaryInput.accept = accept; }
+            StaticUtils.auxiliaryInput.onchange = () => {
+                resolve(StaticUtils.auxiliaryInput.files);
+                StaticUtils.auxiliaryInput.onchange = null;
+            };
+            StaticUtils.auxiliaryInput.value = "";
+            StaticUtils.auxiliaryInput.click();
+            if(accept != null){ StaticUtils.auxiliaryInput.accept = ""; }
+        });
+        return result;
+    }
+
+    static async getFileBytes(file){
+        const result = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => { resolve(new Uint8Array(reader.result)); };
+            reader.onerror = () => { reject(reader.error); };
+            reader.readAsArrayBuffer(file);
+        });
+        return result;
+    }
+
+    static async getFileURL(file){
+        const result = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => { resolve(reader.result); };
+            reader.onerror = () => { reject(reader.error); };
+            reader.readAsDataURL(file);
+        });
+        return result;
+    }
+
+    static async getImage(file){
+        let src = await StaticUtils.getFileURL(file);
+        const result = await new Promise((resolve, reject) => {
+            let image = new Image();
+            image.onload = () => { resolve( image ); }
+            image.onerror = () => { reject( new Image(0,0)); }
+            image.src = src;
+        });
+        return result;
+    }
+
+    static convertImageToImageData(image){
+        StaticUtils.auxiliaryCanvas.width = image.width;
+        StaticUtils.auxiliaryCanvas.height = image.height;
+        let ctx = StaticUtils.auxiliaryCanvas.getContext("2d");
+        ctx.drawImage(image, 0, 0);
+        return ctx.getImageData(0, 0, image.width, image.height);
+    }
+
+    static downloadBytes(bytes, name){
+        const blob = new Blob([bytes], { type: "application/octet-stream" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+}
+
 class BinaryUnit{
     name;
     type;
     data;
 
-    width;
-    height;
+    high;
+    low;
 
     constructor(){
         this.name = new String();
         this.type = BinaryUnit.binaryType.BIN;
         this.data = null;
         
-        this.width = 0;
-        this.height = 0;
+        this.high = 0;
+        this.low = 0;
     }
 
     setName(name){
         this.name = name.slice(0, 8).toUpperCase();
     }
 
+    setMetadata(metadata){
+        if(metadata.length != 16){ return; }
+        let value = Number.parseInt(metadata, 16);
+        this.high = Number.parseInt(metadata.slice(0, 8), 16);
+        this.low = Number.parseInt(metadata.slice(8, 16), 16);
+    }
+
     static binaryType = {
-        BIN: 'BIN\0\0\0\0\0',
-        IMG_1BPP: "IMG_1\0\0\0",
-        IMG_4BPP: "IMG_4\0\0\0",
-        IMG_8BPP: "IMG_8\0\0\0",
-        IMG_24BPP: "IMG_24\0\0",
-        IMG_32BPP: "IMG_32\0\0",
+        //BIN: 'BIN\0\0\0\0\0',
+        //IMG_1BPP: "IMG_1\0\0\0",
+        //IMG_4BPP: "IMG_4\0\0\0",
+        //IMG_8BPP: "IMG_8\0\0\0",
+        //IMG_24BPP: "IMG_24\0\0",
+        //IMG_32BPP: "IMG_32\0\0",
+        BIN: StaticUtils.padString("BIN",8),
+        IMG_1BPP: StaticUtils.padString("IMG_1",8),
+        IMG_4BPP: StaticUtils.padString("IMG_4",8),
+        IMG_8BPP: StaticUtils.padString("IMG_8",8),
+        IMG_24BPP: StaticUtils.padString("IMG_24",8),
+        IMG_32BPP: StaticUtils.padString("IMG_32",8),
     };
+
+    getVisibleName(){
+        return this.name;
+    }
+
+    getVisibleType(){
+        return this.type;
+    }
+
+    getVisibleSize(){
+        return this.data.length+"B";
+    }
+
+    getVisibleMetadata(){
+        let result = StaticUtils.hexifyBytes(StaticUtils.encodeNumber(this.high,4));
+        result += StaticUtils.hexifyBytes(StaticUtils.encodeNumber(this.low,4));
+        return result;
+    }
 
     toString(){
         let extraText = new String();
@@ -36,7 +220,7 @@ class BinaryUnit{
             case BinaryUnit.binaryType.IMG_8BPP:
             case BinaryUnit.binaryType.IMG_24BPP:
             case BinaryUnit.binaryType.IMG_32BPP:
-                extraText = `(${this.width}, ${this.height})`
+                extraText = `(${this.high}, ${this.low})`
                 break;
         }
         return `${this.name} [ ${this.type}${extraText} (${this.data.length}B)]`;
@@ -50,6 +234,10 @@ class FileDisplay{
     image;
 
     page;
+    
+    prevtype;
+    prevhigh;
+    prevlow;
     
     static pageSize = 1 << 15;
 
@@ -66,6 +254,10 @@ class FileDisplay{
         this.text = new String();
         this.image = null;
         this.page = 0;
+
+        this.prevtype = null;
+        this.prevhigh = 0;
+        this.prevlow = 0;
     }
 
     clear(){
@@ -77,8 +269,16 @@ class FileDisplay{
     }
 
     loadBinary(binaryUnit){
-        if(binaryUnit == this.fileUnit){ return; }
+        if(binaryUnit == this.fileUnit &&
+            binaryUnit.type == this.prevtype &&
+            binaryUnit.high == this.prevhigh &&
+            binaryUnit.low == this.prevlow
+        ){ return; }
+        
         this.fileUnit = binaryUnit;
+        this.prevtype = binaryUnit.type;
+        this.prevhigh = binaryUnit.high;
+        this.prevlow = binaryUnit.low;
         
         this.page = 0;
         
@@ -138,8 +338,19 @@ class FileDisplay{
         return Math.ceil(this.fileUnit.data.length / FileDisplay.pageSize) - 1;
     }
 
+    static buildImageCanvas(binaryUnit){
+        let width = binaryUnit.high;
+        let height = binaryUnit.low;
+        if(width == 0 || height == 0){
+            let size = Math.ceil(binaryUnit.data.length / 3);
+            width = Math.floor(Math.sqrt(size));
+            height = Math.ceil(size / width);
+        }
+        return new ImageData(width, height);
+    }
+
     static buildImage_1BPP(binaryUnit){
-        let image = new ImageData(binaryUnit.width, binaryUnit.height);
+        let image = FileDisplay.buildImageCanvas(binaryUnit);
 
         for(let i = 0; i < binaryUnit.data.length; i++){
             for(let l = 0; l < 8; l++){
@@ -155,7 +366,7 @@ class FileDisplay{
     }
 
     static buildImage_4BPP(binaryUnit){
-        let image = new ImageData(binaryUnit.width, binaryUnit.height);
+        let image = FileDisplay.buildImageCanvas(binaryUnit);
 
         for(let i = 0; i < binaryUnit.data.length; i++){
             let nibble = (binaryUnit.data[i] >> 4) & 0xf;
@@ -178,9 +389,9 @@ class FileDisplay{
     }
 
     static buildImage_8BPP(binaryUnit){//grayscale
-        let image = new ImageData(binaryUnit.width, binaryUnit.height);
+        let image = FileDisplay.buildImageCanvas(binaryUnit);
 
-        for(let i = 0; i < this.data.length; i++){
+        for(let i = 0; i < binaryUnit.data.length; i++){
             let index = i * 4;
             let color = binaryUnit.data[i];
             image.data[index] = color;
@@ -193,7 +404,7 @@ class FileDisplay{
     }
 
     static buildImage_24BPP(binaryUnit){
-        let image = new ImageData(binaryUnit.width,binaryUnit.height);
+        let image = FileDisplay.buildImageCanvas(binaryUnit);
 
         for(let i = 0, l = 0; l < binaryUnit.data.length; i += 4, l += 3){
             image.data[i] = binaryUnit.data[l];//r
@@ -206,7 +417,7 @@ class FileDisplay{
     }
 
     static buildImage_32BPP(binaryUnit){
-        let image = new ImageData(binaryUnit.width,binaryUnit.height);
+        let image = FileDisplay.buildImageCanvas(binaryUnit);
 
         for(let i = 0; i < binaryUnit.data.length; i += 4){
             image.data[i] = binaryUnit.data[i + 1];//r
@@ -219,50 +430,11 @@ class FileDisplay{
     }
 
     static buildImage_Default(binaryUnit){
-        let size = Math.ceil(binaryUnit.data.length / 3);
-        let oldWidth = binaryUnit.width;
-        let oldHeight = binaryUnit.height;
-
-        binaryUnit.width = Math.floor(Math.sqrt(size));
-        binaryUnit.height = Math.ceil(size / binaryUnit.width);
-
-        let result = FileDisplay.buildImage_24BPP(binaryUnit);
-
-        binaryUnit.width = oldWidth;
-        binaryUnit.height = oldHeight;
-
-        return result;
+        return FileDisplay.buildImage_24BPP(binaryUnit);
     }
 }
 
 class FileParser{
-    static auxiliaryCanvas = FileParser._createAuxiliaryCanvas();
-    static auxiliaryInput = FileParser._createAuxiliaryInput();
-
-    static _createAuxiliaryCanvas(){
-        let canvas = document.createElement("canvas");;
-        return canvas;
-    }
-
-    static _createAuxiliaryInput(){
-        let input = document.createElement("input");
-        input.type = "file"
-        input.multiple = true;
-        return input;
-    }
-
-    static async requestFiles(){
-        const result = await new Promise((resolve, reject) => {
-            FileParser.auxiliaryInput.onchange = () => {
-                resolve(FileParser.auxiliaryInput.files);
-                FileParser.auxiliaryInput.onchange = null;
-            };
-            FileParser.auxiliaryInput.value = "";
-            FileParser.auxiliaryInput.click();
-        });
-        return result;
-    }
-
     static async parseFile(file){
         let result = new BinaryUnit();
         result.setName(file.name.split('.')[0]);
@@ -274,7 +446,7 @@ class FileParser{
     }
 
     static async requestParsedFiles(){
-        let files = await FileParser.requestFiles();
+        let files = await StaticUtils.requestFiles(null);
 
         let parsedFiles = new Array();
         for(let i = 0; i < files.length; i++){
@@ -284,55 +456,16 @@ class FileParser{
         return parsedFiles;
     }
 
-    static convertImageToImageData(image){
-        FileParser.auxiliaryCanvas.width = image.width;
-        FileParser.auxiliaryCanvas.height = image.height;
-        let ctx = FileParser.auxiliaryCanvas.getContext("2d");
-        ctx.drawImage(image, 0, 0);
-        return ctx.getImageData(0, 0, image.width, image.height);
-    }
-
-    static async getFileBytes(file){
-        const result = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => { resolve(new Uint8Array(reader.result)); };
-            reader.onerror = () => { reject(reader.error); };
-            reader.readAsArrayBuffer(file);
-        });
-        return result;
-    }
-
-    static async getFileURL(file){
-        const result = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => { resolve(reader.result); };
-            reader.onerror = () => { reject(reader.error); };
-            reader.readAsDataURL(file);
-        });
-        return result;
-    }
-
-    static async getImage(file){
-        let src = await FileParser.getFileURL(file);
-        const result = await new Promise((resolve, reject) => {
-            let image = new Image();
-            image.onload = () => { resolve( image ); }
-            image.onerror = () => { reject( new Image(0,0)); }
-            image.src = src;
-        });
-        return result;
-    }
-
     static async parseBinary(file, binaryResult){
         binaryResult.type = BinaryUnit.binaryType.BIN;//Useless if this is a new file.
-        binaryResult.data = await FileParser.getFileBytes(file);
+        binaryResult.data = await StaticUtils.getFileBytes(file);
     }
 
     static async parseImage(file, binaryResult){
-        let imageData = FileParser.convertImageToImageData( await FileParser.getImage(file) );
+        let imageData = StaticUtils.convertImageToImageData( await StaticUtils.getImage(file) );
         binaryResult.type = BinaryUnit.binaryType.IMG_32BPP;
-        binaryResult.width = imageData.width;
-        binaryResult.height = imageData.height;
+        binaryResult.high = imageData.width;
+        binaryResult.low = imageData.height;
 
         
         //ImageData = RGBA
@@ -350,7 +483,7 @@ class FileParser{
     }
 
     static async parseBitmap(file, binaryResult){
-        let bytes = await FileParser.getFileBytes(file);
+        let bytes = await StaticUtils.getFileBytes(file);
         let bitsPerPixel = bytes[28];
         switch( bitsPerPixel ){
             case 1: binaryResult.type = BinaryUnit.binaryType.IMG_1BPP; break;
@@ -454,80 +587,32 @@ class FileSelectionList{
     getFilesIdentity(){
         let result = new Array();
         for(let i = 0; i < this.fileList.length; i++){
-            result.push(this.fileList[i].toString());
+            result.push({
+                name: this.fileList[i].getVisibleName(),
+                type: this.fileList[i].getVisibleType(),
+                size: this.fileList[i].getVisibleSize(),
+                metadata: this.fileList[i].getVisibleMetadata()
+            });
         }
         return result;
     }
 }
 
 class BoxParser{
-    static encodeNumber(number, bytes){
-        let encoded = new Uint8Array(bytes);
-        for(let i = 0; i < bytes; i++){
-            let shift = (bytes - 1 - i) * 8;
-            encoded[i] = (number >> shift) & 0xff;
-        }
-        return encoded;
-    }
-
-    static encodeString(string, bytes){
-        let encoded = new Uint8Array(bytes);
-        let encoder = new TextEncoder();
-        let text = encoder.encode(string);
-
-        for(let i = 0; i < bytes; i++){
-            if(i >= text.length){
-                encoded[i] = 0;
-                continue;
-            }
-            encoded[i] = text[i];
-        }
-
-        return encoded;
-    }
-
-    static decodeString(stream, bytes, index){
-        let result = new String();
-        for(let i = index; i < (bytes + index) && i < stream.length; i++){
-            result += String.fromCharCode(stream[i]);
-        }
-        return result;
-    }
-
-    static decodeNumber(stream, bytes, index){
-        let result = 0;
-        for(let i = index; i < (bytes + index) && i < stream.length; i++){
-            result = (result << 8) | stream[i];
-        }
-        return result;
-    }
-
-    static encodeDate(){
-        let date32 = 0;
-        let now = new Date();
-        date32 = now.getFullYear();
-        date32 = (date32 << 4) | (now.getMonth() + 1);
-        date32 = (date32 << 5) | (now.getDate());
-        date32 = (date32 << 5) | (now.getHours());
-        date32 = (date32 << 6) | (now.getMinutes());
-
-        return BoxParser.encodeNumber(date32,4);
-    }
-
-    static createBinary(binaryUnitList){
+    static buildBinary(binaryUnitList){
         let binaryResult = new Array();
 
         //File format name (4B)
-        binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeString("BOX ", 4));//Magic name
+        binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeString("BOX ", 4));//Magic name
 
         //File entry size (4B)
-        binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeNumber(binaryUnitList.length, 4));
+        binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeNumber(binaryUnitList.length, 4));
 
         //File entry offset (4B) (later modified)
         binaryResult.push(0, 0, 0, 0);
 
         //Date (4B)
-        binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeDate());
+        binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeDate());
         
         let totalSize = 16;
         let offsets = new Array();
@@ -541,44 +626,44 @@ class BoxParser{
         }
 
         //File entry offset rewritting
-        binaryResult.splice(8, 4, ...BoxParser.encodeNumber(totalSize, 4));
+        binaryResult.splice(8, 4, ...StaticUtils.encodeNumber(totalSize, 4));
 
         //File header creation
         for(let i = 0; i < binaryUnitList.length; i++){
             let file = binaryUnitList[i];
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeString(file.name, 8));
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeString(file.type, 8));
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeNumber(file.width, 4));
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeNumber(file.height, 4));
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeNumber(file.data.length, 4));
-            binaryResult.splice(binaryResult.length, 0, ...BoxParser.encodeNumber(offsets[i], 4));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeString(file.name, 8));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeString(file.type, 8));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeNumber(file.high, 4));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeNumber(file.low, 4));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeNumber(file.data.length, 4));
+            binaryResult.splice(binaryResult.length, 0, ...StaticUtils.encodeNumber(offsets[i], 4));
         }
 
         return new Uint8Array(binaryResult);
     }
 
     static parseBinaryBox(bytes){
-        let name = BoxParser.decodeString(bytes, 4, 0);
+        let name = StaticUtils.decodeString(bytes, 4, 0);
         if(name != "BOX "){
             console.error(`Invalid file format ${name}`);
             return;
         }
-        let entrySize = BoxParser.decodeNumber(bytes, 4, 4);
-        let offset = BoxParser.decodeNumber(bytes, 4, 8);
+        let entrySize = StaticUtils.decodeNumber(bytes, 4, 4);
+        let offset = StaticUtils.decodeNumber(bytes, 4, 8);
         let files = new Array();
         for(let i = 0; i < entrySize; i++){
             let index = offset + (i * 32);
 
             let unit = new BinaryUnit();
 
-            unit.name = BoxParser.decodeString(bytes, 8, index);
-            unit.type = BoxParser.decodeString(bytes, 8, index + 8);
+            unit.name = StaticUtils.decodeString(bytes, 8, index);
+            unit.type = StaticUtils.decodeString(bytes, 8, index + 8);
 
-            unit.width = BoxParser.decodeNumber(bytes, 4, index + 16);
-            unit.height = BoxParser.decodeNumber(bytes, 4, index + 20);
+            unit.high = StaticUtils.decodeNumber(bytes, 4, index + 16);
+            unit.low = StaticUtils.decodeNumber(bytes, 4, index + 20);
 
-            let fileSize = BoxParser.decodeNumber(bytes, 4, index + 24);
-            let fileOffset = BoxParser.decodeNumber(bytes, 4, index + 28);
+            let fileSize = StaticUtils.decodeNumber(bytes, 4, index + 24);
+            let fileOffset = StaticUtils.decodeNumber(bytes, 4, index + 28);
             
             let fileData = new Uint8Array(fileSize);
             for(let l = 0; l < fileSize; l++){
@@ -593,7 +678,7 @@ class BoxParser{
     }
 }
 
-//----------------Graphics + systems----------------
+//---------------- Graphics ----------------
 
 class GraphicSystem{
     elementMap;
@@ -637,10 +722,18 @@ class GraphicSystem{
         this.actionMap.get(key)(context, content);
     }
 
-    addClickAction(elementKey, key, content){
+    addClickAction(elementKey, actionKey, content){
         const thisClass = this;
         this.elementMap.get(elementKey).onclick = () => {
-            thisClass.playAction(key, content);
+            thisClass.playAction(actionKey, content);
+        };
+    }
+
+    addKeyAction(elementKey, actionKey, key, content){
+        const thisClass = this;
+        this.elementMap.get(elementKey).onkeydown = (event) => {
+            if(event.key != key){ return; }
+            thisClass.playAction(actionKey, content);
         };
     }
 }

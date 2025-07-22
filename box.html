@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BOX package system</title>
-    <style>
+    <style>/* General Style */
         ::-webkit-scrollbar {
             display: none;
         }
@@ -17,9 +17,9 @@
             -ms-user-select: none;
             user-select: none;
         }
+    </style>
 
-        /* Elements default */
-
+    <style>/* Element Style */
         html, body{
             margin: 0;
             padding: 0;
@@ -60,8 +60,9 @@
             font-family: monospace;
         }
 
-        /* Classes */
+    </style>
 
+    <style>/* Classes Style*/
         button.hard {
             background-color: #607d8b;
         }
@@ -163,9 +164,54 @@
             align-content: center;
         }
     </style>
+
+    <style>/* Modal Style */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            padding: 20px;
+            border-radius: 6px;
+            width: 30%;
+            height: 40%;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .modal button {
+            margin: 5px;
+            padding: 8px 16px;
+        }
+
+    </style>
 </head>
 
 <body>
+    <div id="modalOverlay" class="modal-overlay"> <!-- Modal -->
+        <div class="modal panel-header">
+            <span class="panel-content untouchable centered-text" id="modalMessage" style="overflow: scroll; font-family: monospace;"></span>
+            <input class="panel-content" type="text" id="modalInput" style="font-family: monospace;"/>
+            <div>
+                <button id="modalOk">OK</button>
+                <button id="modalCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="grid-gap" style=" width: 95%; height: 95%; grid-template-rows: 1fr 19fr">
         <div class="grid-gap" style="grid-template-columns: 1fr 1fr;"><!-- Top panel -->
             <button id="compileBox">💾 Save / Compile BOX file</button>
@@ -287,7 +333,7 @@
 
 <script src="./binaryManager.js"></script>
 
-<script>
+<script>//System implementation / linking
     const fsList = new FileSelectionList();
     const gDisplay = new GraphicSystem();
 
@@ -309,33 +355,41 @@
     gDisplay.putElement("text", "FileTextField");
     gDisplay.putElement("image", "FileImageField");
 
+    //Modal elements indexing
+
+    gDisplay.putElement("modalOverlay","ModalOverlay");
+    gDisplay.putElement("modalMessage","ModalMessage");
+    gDisplay.putElement("modalInput","ModalInput");
+    gDisplay.putElement("modalOk","ModalOk");
+    gDisplay.putElement("modalCancel","ModalCancel");
+
     //Values initialization
 
     gDisplay.putValue("SelectedId", 0);
+    gDisplay.putValue("ModalCallbackPayload", null);
 
     //Action creation
 
+    //Box action
+
     gDisplay.putAction("BoxCompile", (context, content) => {//                  Box compile (void)
-        let compiled = BoxParser.createBinary(fsList.fileList);
-        const blob = new Blob([compiled], { type: "application/octet-stream" });
-
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "Package.box";
-        a.click();
-
-        URL.revokeObjectURL(a.href);
+        let compiled = BoxParser.buildBinary(fsList.fileList);
+        StaticUtils.downloadBytes(compiled, "package.box");
     });
 
     gDisplay.putAction("BoxLoad", async (context, content) => {//               Box load (void)
-        let files = await FileParser.requestFiles();
+        let files = await StaticUtils.requestFiles(".box");
         if(files.length == 0){ console.error("No files found at Box loading"); return; }
-        let bytes = await FileParser.getFileBytes(files[0]);
+
+        let bytes = await StaticUtils.getFileBytes(files[0]);
         let parsedList = BoxParser.parseBinaryBox(bytes);
+        
         fsList.fileList = parsedList;
-        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
         context.playAction("SelectFile", {ID: 0});
     });
+
+    //List actions
 
     gDisplay.putAction("GraphicListReset", (context, content) => {//            List Reset (void)
         let listElement = context.getElement("ListFile");
@@ -356,21 +410,34 @@
         context.putValue("SelectedId", index);
     });
 
-    gDisplay.putAction("GraphicListAddItem", (context, content) => {//          List Add (String name) [Inner action]
+    gDisplay.putAction("GraphicListAddItem", (context, content) => {//          List Add (String name, String type, String size, String metadata) [Inner action]
         let listElement = context.getElement("ListFile");
         let id = listElement.children.length;
         let element = document.createElement('div');
+
+        element.style = "display: grid; grid-template-columns: 1fr 2fr 2fr 3fr 2fr 2fr;";
         element.classList.add("file-item");
         element.classList.add("grid-pad");
         element.innerHTML = `
-        <span class="untouchable">[${id}]</span>
-        <span class="untouchable">${content.name}</span>
-        <div class="file-buttons">
+        <span class="untouchable" style="width: 100%; ">[${id}]</span>
+        <span class="untouchable panel-header" style="width: 100%;">${content.name}</span>
+        <span class="untouchable panel-header" style="width: 100%;">${content.type}</span>
+        <span class="untouchable panel-header" style="width: 100%;">${content.metadata}</span>
+        <span class="untouchable" style="width: 100%;">${content.size}</span>
+        <div class="file-buttons" style="width: 100%;">
             <button class="select-btn untouchable">✔</button>
             <button class="move-up-btn untouchable">↑</button>
             <button class="move-down-btn untouchable">↓</button>
         </div>
         `;
+
+        let nameField = element.getElementsByClassName("panel-header")[0];
+        let typeField = element.getElementsByClassName("panel-header")[1];
+        let metadataField = element.getElementsByClassName("panel-header")[2];
+
+        nameField.ondblclick = () => { context.playAction("RenameFile", {ID:id}) };
+        typeField.ondblclick = () => { context.playAction("RetypeFile", {ID:id}) };
+        metadataField.ondblclick = () => { context.playAction("RemetadataFile", {ID:id}) };
 
         let selectBtn = element.getElementsByClassName("select-btn")[0];
         let moveUpBtn = element.getElementsByClassName("move-up-btn")[0];
@@ -383,14 +450,16 @@
         listElement.appendChild(element);
     });
 
-    gDisplay.putAction("GraphicListRebuild", (context, content) => {//          List rebuild (String[] names)
+    gDisplay.putAction("GraphicListRebuild", (context, content) => {//          List rebuild (Object{name, type, size, metadata}[] filesIdentity)
         context.playAction("GraphicListReset", null);
-        let names = content.names;
+        let identities = content.filesIdentity;
         let action = context.getAction("GraphicListAddItem");
-        for(let i = 0; i < names.length; i++){
-            action(context, {name: names[i]});
+        for(let i = 0; i < identities.length; i++){
+            action(context, identities[i]);
         }
     });
+
+    //Display actions
 
     gDisplay.putAction("GraphicDisplayReset", (context, content) => {//         Display reset (void)
         context.getElement("FileBinaryField").value = "";
@@ -416,15 +485,17 @@
         canvas.getContext("2d").putImageData(content.image,0,0);
     });
 
+    //General actions
+
     gDisplay.putAction("AddFile", async (context, content) => {//               General add file (void)
         await fsList.includeFiles();
-        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
         context.playAction("SelectFile", {ID: fsList.selectedIndex});
     });
 
     gDisplay.putAction("RemoveFile", (context, content) => {//                  General remove file (void)
         fsList.removeSelected();
-        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
         if(fsList.fileList.length == 0){
             context.playAction("GraphicDisplayReset", null);
             return;
@@ -467,14 +538,120 @@
 
     gDisplay.putAction("MoveUpFile", (context, content) => {//                  General Move up (int ID)
         fsList.moveFileUp(content.ID);
-        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
         context.playAction("SelectFile", {ID: fsList.selectedIndex});
     });
 
     gDisplay.putAction("MoveDownFile", (context, content) => {//                General Move down (int ID)
         fsList.moveFileDown(content.ID);
-        context.playAction("GraphicListRebuild", {names: fsList.getFilesIdentity()});
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
         context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    gDisplay.putAction("RenameFile", (context, content) => {//                  General Rename (int ID, String ?value)
+        if(content.value == null || content.value == undefined){
+            let name = fsList.fileList[content.ID].name.replaceAll("\0","");
+            let type = fsList.fileList[content.ID].type.replaceAll("\0","");
+            context.playAction("ModalOpen", {
+                callbackPayload: {
+                    callback: "RenameFile",
+                    ID: content.ID
+                },
+                message: `Insert a new name for ("${name}" : ${type})`,
+                value: name,
+                maxlength: "8"
+            });
+            return;
+        }
+
+        let newName = StaticUtils.padString(content.value, 8).toUpperCase();
+        fsList.fileList[content.ID].name = newName;
+
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+        
+    });
+
+    gDisplay.putAction("RetypeFile", (context, content) => {//                  General Retype (int ID, String ?value)
+        if(content.value == null || content.value == undefined){
+            let name = fsList.fileList[content.ID].name.replaceAll("\0","");
+            let type = fsList.fileList[content.ID].type.replaceAll("\0","");
+            
+            context.playAction("ModalOpen", {
+                callbackPayload: {
+                    callback: "RetypeFile",
+                    ID: content.ID
+                },
+                message: `Insert a new type for ("${name}" : ${type})`,
+                value: type,
+                maxlength: "8"
+            });
+            return;
+        }
+
+        let newType = StaticUtils.padString(content.value, 8).toUpperCase();
+        fsList.fileList[content.ID].type = newType;
+
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    gDisplay.putAction("RemetadataFile", (context, content) => {//              General Remetadata (int ID, String ?value)
+        if(content.value == null || content.value == undefined){
+            let name = fsList.fileList[content.ID].name.replaceAll("\0","");
+            let type = fsList.fileList[content.ID].type.replaceAll("\0","");
+            let medatada = fsList.fileList[content.ID].getVisibleMetadata();
+
+            context.playAction("ModalOpen", {
+                callbackPayload: {
+                    callback: "RemetadataFile",
+                    ID: content.ID
+                },
+                message: `Insert a new metadata for ("${name}" : ${type})`,
+                value: medatada,
+                maxlength: "16",
+                pattern: "^[0-9a-fA-F]{16}$"
+            });
+            return;
+        }
+
+        if(!/^[0-9a-fA-F]{16}$/.test(content.value)){ return; }
+
+        fsList.fileList[content.ID].setMetadata(content.value);
+
+        context.playAction("GraphicListRebuild", {filesIdentity: fsList.getFilesIdentity()});
+        context.playAction("SelectFile", {ID: fsList.selectedIndex});
+    });
+
+    //Modal actions
+
+    gDisplay.putAction("ModalOpen", (context, content) => {//                   Modal Open (Object callbackPayload, String ?message, String ?value, String ?placeholder, String ?maxlength, String ?pattern)
+        context.getElement("ModalOverlay").style.display = "flex";
+
+        context.getElement("ModalMessage").innerText = content.message == null ? "" : content.message;
+
+        let input = context.getElement("ModalInput");
+        input.value = content.value == null ? "" : content.value;
+        input.placeholder = content.placeholder == null ? "" : content.placeholder;
+        input.maxLength = content.maxlength == null ? "-1" : content.maxlength;
+        input.pattern = content.pattern == null ? "" : content.pattern;
+        setTimeout(() => { input.focus(); }, 100);
+
+        context.putValue("ModalCallbackPayload", content.callbackPayload);
+    });
+
+    gDisplay.putAction("ModalClose", (context, content) => {//                  Modal Close (void)
+        context.getElement("ModalOverlay").style.display = "none";
+    });
+
+    gDisplay.putAction("ModalConfirm", (context, content) => {//                Modal Confirm (void)
+        context.playAction("ModalClose", null);
+        let callbackPayload = context.getValue("ModalCallbackPayload");
+        if(callbackPayload == null){ return; }
+        context.putValue("ModalCallbackPayload", null);
+        let inputContent = context.getElement("ModalInput").value;
+        callbackPayload.value = inputContent;
+        context.playAction(callbackPayload.callback, callbackPayload);
     });
 
     //Button linking
@@ -485,6 +662,11 @@
     gDisplay.addClickAction("RemoveFile", "RemoveFile", null);
     gDisplay.addClickAction("NextPage", "NextPage", null);
     gDisplay.addClickAction("PreviousPage", "PreviousPage", null);
+
+    gDisplay.addClickAction("ModalCancel", "ModalClose", null);
+    gDisplay.addClickAction("ModalOk", "ModalConfirm", null);
+
+    gDisplay.addKeyAction("ModalInput", "ModalConfirm", "Enter", null);
 
 </script>
 
