@@ -174,7 +174,6 @@ class BinaryUnit{
 
     setMetadata(metadata){
         if(metadata.length != 16){ return; }
-        let value = Number.parseInt(metadata, 16);
         this.high = Number.parseInt(metadata.slice(0, 8), 16);
         this.low = Number.parseInt(metadata.slice(8, 16), 16);
     }
@@ -382,7 +381,7 @@ class FileDisplay{
         return image;
     }
 
-    static buildImage_8BPP(binaryUnit){//grayscale
+    static buildImage_8BPP(binaryUnit){//grey scale
         let image = FileDisplay.buildImageCanvas(binaryUnit);
 
         for(let i = 0; i < binaryUnit.data.length; i++){
@@ -461,7 +460,6 @@ class FileParser{
         binaryResult.high = imageData.width;
         binaryResult.low = imageData.height;
 
-        
         //ImageData = RGBA
         //Correct   = ARGB
         let correctedData = new Uint8Array(imageData.data.length);
@@ -510,7 +508,7 @@ class FileParser{
         let indices = new Uint8Array( binaryResult.data.length / 4 );//ARGB -> Index(0-255)
         for(let i = 0, l = 0; i<binaryResult.data.length; i += 4, l++){
             let color = 0;
-            for(let k = 1; k < 4; k++){//ignoring the first byte, since it its the alpha.
+            for(let k = 1; k < 4; k++){//ignoring the first byte, since it is the alpha.
                 color = (color << 8) | binaryResult.data[i + k];
             }
             indices[l] = extractedPalette.indexOf(color);
