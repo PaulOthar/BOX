@@ -235,7 +235,7 @@ class FileDisplay{
     static pageSize = 1 << 15;
 
     static nibblePalette = [
-        0x000000,0x111111,0x818181,0xffffff,
+        0xff00ff,0x111111,0x818181,0xffffff,
         0xff0000,0xaa0000,0x550000,0x2a0000,
         0x00ff00,0x00aa00,0x005500,0x002a00,
         0x00ffff,0x00aaaa,0x005555,0x002a2a
@@ -301,7 +301,14 @@ class FileDisplay{
 
             //Hexadecimal writting
             if((i & 0x7) == 0){
-                if(i > start){ this.hexadecimal += "\n"; }
+                if(i > start){
+                    this.hexadecimal += " | ";
+                    for(let l = i - 8; l < i; l++){
+                        let symb = this.fileUnit.data[l];
+                        this.hexadecimal += (symb > 31) && (symb < 128) ? String.fromCharCode(symb) : ".";
+                    }
+                    this.hexadecimal += "\n";
+                }
                 this.hexadecimal += "[";
                 for(let l = 0; l < 8; l++){ this.hexadecimal += ((i >> ((7-l) * 4)) & 0xf).toString(16); }
                 this.hexadecimal += "]";

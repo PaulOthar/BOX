@@ -40,6 +40,11 @@
             background-color: #4caf50;
             cursor: pointer;
             color: #f0f0f0;
+            transition-duration: 0.5s;
+        }
+
+        button:hover {
+            background-color: #337936;
         }
 
         canvas, textarea{
@@ -65,6 +70,10 @@
     <style>/* Classes Style*/
         button.hard {
             background-color: #607d8b;
+            transition-duration: 0.5s;
+        }
+        button.hard:hover {
+            background-color: #475c66;
         }
 
         .grid, div {
@@ -133,6 +142,11 @@
             padding-top: 0.2em;
             padding-bottom: 0.2em;
             font-family: monospace;
+            transition-duration: 0.5s;
+        }
+
+        .file-item:hover {
+            background-color: #1866a5;
         }
 
         .file-item.selected {
@@ -549,6 +563,7 @@
     });
 
     gDisplay.putAction("RenameFile", (context, content) => {//                  General Rename (int ID, String ?value)
+        debugger;
         if(content.value == null || content.value == undefined){
             let name = fsList.fileList[content.ID].name.replaceAll("\0","");
             let type = fsList.fileList[content.ID].type.replaceAll("\0","");
